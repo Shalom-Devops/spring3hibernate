@@ -11,7 +11,7 @@ stages:
   
   - name: Test
     tasks:
-      - name: Run SonarQube Tests
+      - name: code Quality 
         plugin: SonarQube Scanner
         configuration:
           sonarQubeProjectName: Java Project
