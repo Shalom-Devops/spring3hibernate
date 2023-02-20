@@ -1,0 +1,79 @@
+version: 2
+plan:
+  - plan: My Plan
+    trigger:
+      branches:
+        include:
+          - master
+    stages:
+      - stage: Git Checkout
+        jobs:
+          - job: Checkout
+            tasks:
+              - git-checkout: # Checkout the code from the Git repository
+                  repository: my-repo
+                  branch: master
+      - stage: SonarQube Test
+        jobs:
+          - job: SonarQube
+            tasks:
+              - script: # Run the SonarQube analysis on the code
+                  name: SonarQube
+                  inline: |
+                    sonar-scanner \
+                      -Dsonar.host.url=https://sonarqube.mycompany.com \
+                      -Dsonar.login=my-sonar-token \
+                      -Dsonar.projectKey=my-project-key \
+                      -Dsonar.sources=src \
+                      -Dsonar.tests=tests \
+                      -Dsonar.test.inclusions=**/*Test.java \
+                      -Dsonar.java.binaries=build/classes
+              - script: # Check the SonarQube quality gate status
+                  name: SonarQube Quality Gate
+                  inline: |
+                    quality_gate_status=$(curl -s -u my-sonar-token: "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=my-project-key" | jq -r .projectStatus.status)
+                    if [[ "$quality_gate_status" != "OK" ]]; then
+                      echo "Quality gate status is $quality_gate_status, failing the build."
+                      exit 1
+                    fi
+      - stage: Unit Test
+        jobs:
+          - job: Unit Test
+            tasks:
+              - script: # Run the unit tests
+                  name: Unit Test
+                  inline: |
+                    ./gradlew test
+              - junit: # Parse the unit test results
+                  testResultsDirectory: build/test-results
+                  outputFile: junit.xml
+      - stage: Selenium Test
+        jobs:
+          - job: Selenium Test
+            tasks:
+              - script: # Run the Selenium tests
+                  name: Selenium Test
+                  inline: |
+                    ./gradlew seleniumTest
+              - junit: # Parse the Selenium test results
+                  testResultsDirectory: build/test-results/seleniumTest
+                  outputFile: seleniumTest.xml
+      - stage: Publish to Artifactory
+        jobs:
+          - job: Publish
+            tasks:
+              - script: # Publish the build artifacts to Artifactory
+                  name: Artifactory Publish
+                  inline: |
+                    ./gradlew artifactoryPublish
+      - stage: Functional Testing
+        jobs:
+          - job: Functional Test
+            tasks:
+              - script: # Run the functional tests
+                  name: Functional Test
+                  inline: |
+                    ./gradlew functionalTest
+              - junit: # Parse the functional test results
+                  testResultsDirectory: build/test-results/functionalTest
+                  outputFile: functionalTest.xml
